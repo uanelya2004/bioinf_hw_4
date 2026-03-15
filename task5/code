@@ -1,0 +1,58 @@
+import numpy as np
+from Bio import SeqIO
+
+record = SeqIO.read("chr1.fasta", "fasta")
+seq = str(record.seq[:10000]).upper()
+
+# оставляем только ACGT (т.к. в реальном геноме могут встречаться N - неизв. нуклеотид)
+seq = "".join(n for n in seq if n in "ACGT")
+
+print("Длина последовательности:", len(seq))
+
+NUCLEOTIDES = ["A", "C", "G", "T"]
+nuc_index = {n: i for i, n in enumerate(NUCLEOTIDES)}
+
+# функция для вывода матриц
+def print_matrix(matrix, title):
+    print(f"\n{title}")
+    print("from\\to     A        C        G        T")
+    for nuc, row in zip(NUCLEOTIDES, matrix):
+        values = "  ".join(f"{v:7.4f}" for v in row)
+        print(f"{nuc:>6}  {values}")
+
+# подсчёт динуклеотидов
+counts = np.zeros((4,4))
+
+for i in range(len(seq)-1):
+    a = nuc_index[seq[i]]
+    b = nuc_index[seq[i+1]]
+    counts[a,b] += 1
+
+print_matrix(counts, "Матрица частот динуклеотидов:")
+
+# матрица переходов
+P = counts / counts.sum(axis=1, keepdims=True)
+print_matrix(P, "Матрица переходов P:")
+
+# проверка
+print("\nСуммы строк:", np.round(P.sum(axis=1),6))
+
+# стационарное распределение
+eigvals, eigvecs = np.linalg.eig(P.T)
+
+idx = np.argmin(np.abs(eigvals - 1))
+stationary = eigvecs[:,idx].real
+stationary /= stationary.sum()
+
+print("\nСтационарное распределение:")
+for n, p in zip(NUCLEOTIDES, stationary):
+    print(f"{n}: {p:.4f}")
+
+# наблюдаемые частоты
+indices = np.array([nuc_index[n] for n in seq])
+observed = np.bincount(indices, minlength=4)
+observed = observed / observed.sum()
+
+print("\nСравнение:")
+for n, stat, obs in zip(NUCLEOTIDES, stationary, observed):
+    print(f"{n}: stationary={stat:.4f}, observed={obs:.4f}")
