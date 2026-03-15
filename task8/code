@@ -1,0 +1,91 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+NUCLEOTIDES = ["A", "C", "G", "T"]
+nuc_index = {n: i for i, n in enumerate(NUCLEOTIDES)}
+
+# генерация последовательности
+def generate_sequence(P, length, start_state):
+    sequence = [start_state]
+    current = nuc_index[start_state]
+
+    for _ in range(length - 1):
+        current = np.random.choice(4, p=P[current])
+        sequence.append(NUCLEOTIDES[current])
+
+    return "".join(sequence)
+
+# матрица динуклеотидных переходов
+def get_dinuc_matrix(seq):
+    counts = np.zeros((4, 4))
+
+    for i in range(len(seq) - 1):
+        a = nuc_index[seq[i]]
+        b = nuc_index[seq[i + 1]]
+        counts[a, b] += 1
+
+    return counts / counts.sum(axis=1, keepdims=True)
+
+# генерируем последовательности
+np.random.seed(42)
+
+sequences = []
+for i in range(10):
+    start = np.random.choice(NUCLEOTIDES)
+    seq = generate_sequence(P, 1000, start)
+    sequences.append(seq)
+    print(f"Последовательность {i+1}: начало={start}, первые 20 нт: {seq[:20]}")
+
+# считаем эмпирическую матрицу
+empirical_matrices = [get_dinuc_matrix(seq) for seq in sequences]
+empirical_P = np.mean(empirical_matrices, axis=0)
+
+# разность
+diff = np.abs(P - empirical_P)
+
+# функция печати матриц
+def print_matrix(matrix, title):
+    print(f"\n{title}")
+    print("from\\to    A       C       G       T")
+    for nuc, row in zip(NUCLEOTIDES, matrix):
+        values = " ".join(f"{v:7.4f}" for v in row)
+        print(f"{nuc:>6}  {values}")
+
+print_matrix(P, "Исходная матрица P:")
+print_matrix(empirical_P, "Эмпирическая матрица (среднее по 10 последовательностям):")
+
+print(f"\nМаксимальное отклонение: {diff.max():.4f}")
+print(f"Среднее отклонение:      {diff.mean():.4f}")
+
+# тепловые карты
+fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+
+vmin = min(P.min(), empirical_P.min())
+vmax = max(P.max(), empirical_P.max())
+
+# исходная матрица
+im1 = axes[0].imshow(P, cmap="Blues", vmin=vmin, vmax=vmax)
+axes[0].set_title("Исходная матрица P")
+
+# эмпирическая
+im2 = axes[1].imshow(empirical_P, cmap="Blues", vmin=vmin, vmax=vmax)
+axes[1].set_title("Эмпирическая матрица")
+
+for ax in axes:
+    ax.set_xticks(range(4))
+    ax.set_yticks(range(4))
+    ax.set_xticklabels(NUCLEOTIDES)
+    ax.set_yticklabels(NUCLEOTIDES)
+
+# значения в клетках
+for i in range(4):
+    for j in range(4):
+        axes[0].text(j, i, f"{P[i,j]:.3f}", ha="center", va="center", fontsize=8)
+        axes[1].text(j, i, f"{empirical_P[i,j]:.3f}", ha="center", va="center", fontsize=8)
+
+plt.colorbar(im1, ax=axes[0])
+plt.colorbar(im2, ax=axes[1])
+
+plt.tight_layout()
+plt.savefig("heatmaps.png", dpi=150)
+plt.show()
