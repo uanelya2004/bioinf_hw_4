@@ -1,0 +1,50 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+BG_PROBS = [0.295, 0.205, 0.205, 0.295]  # A C G T
+NUCLEOTIDES = ["A", "C", "G", "T"]
+nuc_index = {n: i for i, n in enumerate(NUCLEOTIDES)}
+
+# генерируем случайные посл-ти
+def generate_random_sequences(n, length=9):
+    return np.random.choice(NUCLEOTIDES, size=(n, length), p=BG_PROBS)
+
+# считаем скор по pwm для каждой посл-ти
+def score_sequences(seqs, pwm):
+    scores = np.zeros(len(seqs))
+
+    for pos in range(seqs.shape[1]):
+        for nuc in NUCLEOTIDES:
+            mask = seqs[:, pos] == nuc
+            scores[mask] += pwm[nuc_index[nuc], pos]
+
+    return scores
+
+# генерируем посл-ти
+random_seqs = generate_random_sequences(100_000, 9)
+
+bg_scores = score_sequences(random_seqs, pwm)
+
+print(f"Средний скор: {bg_scores.mean():.3f}")
+print(f"Максимальный скор: {bg_scores.max():.3f}")
+
+# гистограмма
+plt.figure(figsize=(8, 5))
+plt.hist(bg_scores, bins=100)
+plt.xlabel("PWM score")
+plt.ylabel("Количество последовательностей")
+plt.title("Распределение скоров случайных последовательностей")
+plt.savefig("bg_score_distribution.png", dpi=300)
+plt.show()
+
+def get_pvalue(score):
+    return np.mean(bg_scores >= score)
+
+# threshold: p-value ≈ 10−4
+target = 1e-4
+k = int(len(bg_scores) * target)  # число посл-й превышаюих порог
+
+threshold = np.sort(bg_scores)[-k]
+
+print(f"\nThreshold для p-value = 1e-4: {threshold:.4f}")
+print(f"Проверим p-value: {get_pvalue(threshold):.6f}")
