@@ -1,0 +1,89 @@
+import numpy as np
+from scipy.stats import chi2
+from Bio import SeqIO
+
+NUCLEOTIDES = ["A", "C", "G", "T"]
+nuc_index = {n: i for i, n in enumerate(NUCLEOTIDES)}
+
+# подсчёт наблюдаемых частот динуклеотидов
+def get_observed_counts(seq):
+    counts = np.zeros((4, 4))
+
+    for i in range(len(seq) - 1):
+        a = nuc_index[seq[i]]
+        b = nuc_index[seq[i+1]]
+        counts[a, b] += 1
+
+    return counts
+
+
+# хи-квадрат тест
+def chi2_test(seq):
+    N = len(seq) - 1
+
+    # наблюдаемые частоты
+    O = get_observed_counts(seq)
+
+    # частоты отдельных нуклеотидов
+    nuc_counts = np.array([seq.count(n) for n in NUCLEOTIDES])
+    p = nuc_counts / nuc_counts.sum()
+
+    # ожидаемые частоты
+    E = np.outer(p, p) * N
+
+    # хи-квадрат статистика
+    chi2_stat = np.sum((O - E) ** 2 / E)
+
+    # p-value
+    df = 9
+    p_value = chi2.sf(chi2_stat, df)
+
+    return O, E, chi2_stat, p_value
+
+
+# печать матрицы
+def print_matrix(M, title):
+    print(f"\n{title}")
+    print("    A      C      G      T")
+    for nuc, row in zip(NUCLEOTIDES, M):
+        values = " ".join(f"{v:7.1f}" for v in row)
+        print(f"{nuc} {values}")
+
+
+# загрузка реальной последовательности
+record = SeqIO.read("chr1.fasta", "fasta")
+real_seq = str(record.seq[:10000]).upper()
+real_seq = "".join(n for n in real_seq if n in "ACGT")
+
+
+# генерация случайной последовательности (0-го порядка)
+counts = np.array([real_seq.count(n) for n in NUCLEOTIDES])
+freq = counts / counts.sum()
+
+random_seq = "".join(
+    np.random.choice(NUCLEOTIDES, size=len(real_seq), p=freq)
+)
+
+
+# тестируем обе последовательности
+datasets = [
+    ("Реальная последовательность", real_seq),
+    ("Случайная последовательность", random_seq)
+]
+
+for name, seq in datasets:
+
+    O, E, chi2_stat, p_value = chi2_test(seq)
+
+    print(name)
+
+    print_matrix(O, "Наблюдаемые частоты O:")
+    print_matrix(E, "Ожидаемые частоты E:")
+
+    print(f"\nχ² = {chi2_stat:.2f}")
+    print(f"p-value = {p_value:.3e}")
+
+    if p_value < 0.05:
+        print("Вывод: отвергаем гипотезу независимости - модель 1-го порядка")
+    else:
+        print("Вывод: нет оснований отвергнуть гипотезу независимости - модель 0-го порядка")
