@@ -1,0 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from Bio import SeqIO
+
+# загружаем последовательность
+record = SeqIO.read("chr1.fasta", "fasta")
+seq = str(record.seq[:100_000]).upper()
+
+WINDOW = 200
+
+# функция окна
+def compute_cpg_ratio(window):
+    n = len(window)
+
+    p_C = window.count("C") / n
+    p_G = window.count("G") / n
+    p_CG = window.count("CG") / (n - 1)
+
+    gc_percent = 100 * (window.count("C") + window.count("G")) / n
+
+    den = p_C * p_G
+    r_CG = p_CG / den if den > 0 else 0
+
+    return r_CG, gc_percent
+
+# скользящее окно
+positions = []
+r_values = []
+gc_values = []
+
+for i in range(len(seq) - WINDOW + 1):
+    window = seq[i:i + WINDOW]
+    r_CG, gc = compute_cpg_ratio(window)
+    positions.append(i)
+    r_values.append(r_CG)
+    gc_values.append(gc)
+
+positions = np.array(positions)
+r_values = np.array(r_values)
+gc_values = np.array(gc_values)
+
+# находим CpG острова
+cpg_islands = [
+    (pos, pos + WINDOW)
+    for pos, r, gc in zip(positions, r_values, gc_values)
+    if r > 0.6 and gc > 50
+]
+
+print(f"Найдено CpG островков: {len(cpg_islands)}")
+print("\nКоординаты CpG островков:")
+for start, end in cpg_islands:
+    print(f"  {start} — {end}")
+
+# график
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
+for i, (start, end) in enumerate(cpg_islands):
+    label = "CpG остров" if i == 0 else "_"
+    ax1.axvspan(start, end, alpha=0.3, color="orange", label=label)
+    ax2.axvspan(start, end, alpha=0.3, color="orange", label="_")
+
+# R(CG)
+ax1.plot(positions, r_values, color="steelblue", linewidth=0.8)
+ax1.axhline(y=0.6, color="red", linestyle="--", linewidth=1, label="порог R = 0.6")
+ax1.set_ylabel("R(CG)")
+ax1.set_title("Детектор CpG островков (chr1, первые 100 000 нт)")
+ax1.legend()
+ax1.set_ylim(0, max(r_values)*1.1)
+
+# закрашиваем найденные острова
+for start, end in cpg_islands:
+    ax1.axvspan(start, end, alpha=0.3, color="orange")
+    ax2.axvspan(start, end, alpha=0.3, color="orange", label="_")
+
+# GC%
+ax2.plot(positions, gc_values, color="seagreen", linewidth=0.8)
+ax2.axhline(y=50, color="red", linestyle="--", linewidth=1, label="порог GC = 50%")
+ax2.set_ylabel("GC%")
+ax2.set_xlabel("Позиция в геноме")
+ax2.legend()
+
+plt.tight_layout()
+plt.savefig("cpg_islands.png", dpi=150)
+plt.show()
