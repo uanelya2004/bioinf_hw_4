@@ -1,0 +1,46 @@
+from Bio import motifs, SeqIO
+from Bio.Seq import Seq
+
+THRESHOLD = 5.0
+
+# создаём мотив
+instances = [Seq(s) for s in sites]
+m = motifs.create(instances)
+
+print("Наш мотив и его длина:", m.consensus, len(m))
+
+# загружаем chr1
+record = next(SeqIO.parse("chr1.fasta", "fasta"))
+sequence = record.seq[:1_000_000]
+
+# используем PSSM (log-odds PWM), чтобы применять порог score > 5.0
+m.pseudocounts = 0.1
+pssm = m.pssm
+
+hits = []
+
+# прямая цепь
+for pos, score in pssm.search(sequence, threshold=THRESHOLD):
+    hits.append((pos, "+", round(score, 4)))
+
+# обратная цепь
+rev = sequence.reverse_complement()
+
+for pos, score in pssm.search(rev, threshold=THRESHOLD):
+    real_pos = len(sequence) - pos - len(m)
+    hits.append((real_pos, "-", round(score, 4)))
+
+hits.sort()
+
+print(f"\nНайдено хитов: {len(hits)}")
+print(f"\n{'Position':>10} {'Strand':>7} {'Score':>7}")
+print("-" * 30)
+
+for h in hits:
+    print(f"{h[0]:>10} {h[1]:>5} {h[2]:>10.4f}")
+
+# сразу запишем в файл
+with open("hits_hw4.txt", "w") as f:
+    f.write("Position Strand Score\n")
+    for pos, strand, score in hits:
+        f.write(f"{pos} {strand} {score:.4f}\n")
