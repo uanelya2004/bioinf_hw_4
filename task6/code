@@ -1,0 +1,56 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+norms = []
+k_values = range(1, 1001)
+
+P_k = P.copy()
+
+for k in k_values:
+    if k > 1:
+        P_k = P_k @ P  # P^k = P^(k-1) * P
+
+    # вывод нескольких матриц P^k чтобы увидеть стабилизацию
+    if k in [1, 2, 3, 5, 10, 20, 100, 1000]:
+        print(f"\nМатрица P^{k}:")
+        for nuc, row in zip(NUCLEOTIDES, P_k):
+            values = " ".join(f"{v:.6f}" for v in row)
+            print(f"{nuc}: {values}")
+
+    norm = np.linalg.norm(P_k - P, 'fro') if k == 1 else np.linalg.norm(P_k - P_prev, 'fro')
+    norms.append(norm)
+
+    P_prev = P_k.copy()
+
+# график стабилизации
+plt.figure(figsize=(8,5))
+
+eps = 1e-16
+stable_k = None
+
+# пропускаем первый элемент (искусственный)
+for i, n in enumerate(norms[1:], start=2):
+    if n < eps:
+        stable_k = i
+        break
+
+plt.plot(k_values, norms)
+plt.xlabel("k")
+plt.ylabel(r"||$P^k - P^{k-1}$||")
+plt.axvline(stable_k, linestyle="--", label=f"стабилизация при k ≈ {stable_k}")
+plt.title("Стабилизация матрицы переходов")
+plt.yscale("log")
+plt.legend()
+plt.tight_layout()
+plt.savefig("convergence.png", dpi=150)
+plt.show()
+
+
+
+print("\nСтационарное распределение π:")
+for nuc, prob in zip(NUCLEOTIDES, stationary):
+    print(f"{nuc}: {prob:.6f}")
+
+# проверка
+max_diff = np.max(np.abs(P_k - stationary))
+print(f"\nМаксимальное отклонение строк P^1000 от π: {max_diff:.16f}")
