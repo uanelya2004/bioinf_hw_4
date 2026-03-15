@@ -1,0 +1,36 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# энтропия Шеннона
+safe_ppm = np.clip(ppm, 1e-12, 1) # избегаем log2(0)
+
+H = -np.sum(ppm * np.log2(safe_ppm), axis=0)
+IC = 2 - H
+
+print("Энтропия и IC по позициям:")
+for i in range(len(H)):
+    print(f"позиция {i+1}: H = {H[i]:.4f}, IC = {IC[i]:.4f}")
+
+# График
+positions = np.arange(1, len(IC) + 1)
+
+plt.figure(figsize=(8,5))
+plt.bar(positions, IC)
+plt.xlabel("Позиция")
+plt.ylabel("IC")
+plt.title("Информационное содержание позиций мотива")
+plt.xticks(positions)
+plt.tight_layout()
+plt.savefig("ic_plot.png", dpi=150)
+plt.show()
+
+# Кор-мотив
+core_threshold = 1.5
+
+core_positions = np.where(IC >= core_threshold)[0] + 1
+temp_variable_positions = np.where((IC > 0.5 * core_threshold) & (IC < core_threshold))[0] + 1
+variable_positions = np.where(IC < 0.5 *  core_threshold)[0] + 1
+
+print("\nКор-мотив:", core_positions)
+print("Умеренно вариабельные позиции:", temp_variable_positions)
+print("Вариабельные позиции:", variable_positions)
